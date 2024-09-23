@@ -1,17 +1,31 @@
 // data file
 #include <avr/pgmspace.h>
-#include "data0.h"
+#include "data.h"
 
 //Define Sv values
 int sv0;
 int sv1;
 
-#define pot A0
-int potVal;
-int ddt = 1000; //dynamic delay time
+
+int ddt = 200; //dynamic delay time
+
+#define bpm 300
+#define on_percent 0.6
+
+#define cycle_time_ms 60000/bpm
+#define on_time_ms on_percent*cycle_time_ms
+#define off_time_ms cycle_time_ms - on_time_ms
 
 //define relays 
 int relays1[] = {44,45,46,47,48,49,50,51,52,53};
+//                    S  S  L  L
+int right_relays[] = {47,53,46,52};
+int left_relays[] =  {48,51,49,50};
+int right_light = 44;
+int left_light = 45;
+
+unsigned char left_relaypattern[] = {0b0000,0b0010,0b0011,0b0100,0b0101,0b0110,0b0111,0b1111,0b1111};
+unsigned char right_relaypattern[] = {0b0000,0b0010,0b0011,0b0100,0b0101,0b0110,0b0111,0b1100,0b1111};
 
 void setup() {
   Serial.begin(115200);
@@ -33,17 +47,16 @@ void setup() {
    for (int relay:relays1)
   {
     pinMode(relay, OUTPUT);
-    digitalWrite(relay, LOW);
+    digitalWrite(relay, HIGH);
   }
   // Initial Test
-  delay(1000); 
   for (int relay:relays1)
   {
-    digitalWrite(relay, HIGH);
-    delay(1000);
+    digitalWrite(relay, LOW);
+    delay(100);
     digitalWrite(relay, HIGH);
   }
-  delay(1000);
+
 }
 
 
@@ -53,31 +66,29 @@ void loop() {
   {
     
     unsigned char sv0 = pgm_read_byte_near(data + arrayPos);
-    potVal = analogRead(A0);
-    ddt = map(potVal, 0, 1023,700,50); //variable, min in, max in, max out, min out
-    Serial.println(ddt);
 
     Serial.print(sv0);
     Serial.print(" ");
 
     // sv0 - Control Relay 1-8
-    if(sv0 >= 0 && sv0 <10){
-        for (int i:relays1){
-          digitalWrite(i, HIGH);
+    if(sv0 >= 0 && sv0 <=8){
+      unsigned char left_data_pattern = left_relaypattern[sv0];
+      int i = 0;
+        for (int relay: left_relays){
+          digitalWrite(relay, !((left_data_pattern >> i) & 0b0001));
+
+          Serial.print((left_data_pattern >> i) & 0b0001);
+          Serial.print(" ");
+          i++;
         }
-      digitalWrite(relays1[sv0],LOW); 
     }
 
-    // if(sv0 == 8){
-    //   for (int i:relays1){
-    //     digitalWrite(i, LOW);
-    //   }
-    // }
-    delay(ddt*0.1 * sv0);
-    for (int i:relays1){
+    delay(on_time_ms);
+    for (int i:left_relays){
         digitalWrite(i, HIGH);
       }
-    delay(ddt*0.2 * sv0);
+    delay(off_time_ms);
+    Serial.println("");
   }
   Serial.println(".... no more data");
 }
